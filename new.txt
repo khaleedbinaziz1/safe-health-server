@@ -1,0 +1,243 @@
+const express = require('express');
+const cors = require('cors');
+const { MongoClient } = require('mongodb');
+require('dotenv').config()
+
+const port = process.env.PORT || 500;
+
+
+const app = express();
+
+//middleware
+app.use(cors());
+app.use(express.json());
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ujcbv.mongodb.net/?retryWrites=true&w=majority`;
+
+console.log(uri);
+
+
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, });
+
+async function run() {
+    try {
+        const appointmentOptionCollection = client.db('safeHealth').collection('appointmentOptions')
+        const bookingsCollection = client.db('safeHealth').collection('bookings')
+        app.get('/appointmentOptions', async (req, res) => {
+            const date = req.query.date;
+            const query = {};
+            const options = await appointmentOptionCollection.find(query).toArray();
+            const bookingQuery = { appointmentDate: date }
+            const alreadyBooked = await bookingsCollection.find(bookingQuery).toArray();
+
+            options.forEach(options => {
+                const optionBooked = alreadyBooked.filter(book => book.treatment === options.name);
+                const bookedSlots = optionBooked.map(book => book.slot)
+                const remainingSlots = options.slots.filter(slot => !bookedSlots.includes(slot))
+                options.slots = remainingSlots;
+            })
+            res.send(options);
+        })
+       
+          
+
+        app.post('/bookings', async (req, res) => {
+            const booking = req.body
+            console.log(booking);
+            const query = {
+                appointmentDate: booking.appointmentDate,
+                email: booking.email,
+                treatment: booking.treatment
+            }
+            const bookingCounts = await bookingsCollection.find(query).toArray();
+            if (bookingCounts.length) {
+                const message = `you already have an appointment on ${booking.appointmentDate}`
+                return res.send({ acknowledged: false, message })
+
+            }
+
+            const result = await bookingsCollection.insertOne(booking);
+            res.send(result);
+        })
+    }
+    finally {
+
+    }
+}
+run().catch(console.log)
+
+
+app.get('/', async (req, res) => {
+    res.send('doctors server is running');
+})
+
+app.listen(port, () => console.log(`listening on port ${port}`));
+
+
+
+
+
+
+
+
+
+new
+const express = require('express');
+const cors = require('cors');
+const { MongoClient } = require('mongodb');
+require('dotenv').config();
+
+const port = process.env.PORT || 500;
+
+const app = express();
+
+//middleware
+app.use(cors());
+app.use(express.json());
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ujcbv.mongodb.net/?retryWrites=true&w=majority`;
+
+console.log(uri);
+
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+
+async function run() {
+  try {
+    const appointmentOptionCollection = client.db('safeHealth').collection('appointmentOptions');
+    const bookingsCollection = client.db('safeHealth').collection('bookings');
+
+    app.get('/appointmentOptions', async (req, res) => {
+      const searchTerm = req.query.q;
+      const query = searchTerm ? { name: new RegExp(searchTerm, 'i') } : {};
+      const options = await appointmentOptionCollection.find(query).toArray();
+      const date = req.query.date;
+      const bookingQuery = { appointmentDate: date };
+      const alreadyBooked = await bookingsCollection.find(bookingQuery).toArray();
+
+      options.forEach(options => {
+        const optionBooked = alreadyBooked.filter(book => book.treatment === options.name);
+        const bookedSlots = optionBooked.map(book => book.slot);
+        const remainingSlots = options.slots.filter(slot => !bookedSlots.includes(slot));
+        options.slots = remainingSlots;
+      });
+      res.send(options);
+    });
+
+    app.get('/appointmentList', async (req, res) => {
+      const bookings = await bookingsCollection.find().toArray();
+      res.send(bookings);
+    });
+
+    app.post('/bookings', async (req, res) => {
+      const booking = req.body;
+      console.log(booking);
+      const query = {
+        appointmentDate: booking.appointmentDate,
+        email: booking.email,
+        treatment: booking.treatment
+      };
+      const bookingCounts = await bookingsCollection.find(query).toArray();
+      if (bookingCounts.length) {
+        const message = `you already have an appointment on ${booking.appointmentDate}`;
+        return res.send({ acknowledged: false, message });
+      }
+
+      const result = await bookingsCollection.insertOne(booking);
+      res.send(result);
+    });
+  } finally {
+  }
+}
+
+run().catch(console.log);
+
+app.get('/', async (req, res) => {
+  res.send('doctors server is running');
+});
+
+app.listen(port, () => console.log(`listening on port ${port}`));
+
+
+
+
+
+
+
+
+
+
+
+const express = require('express');
+const cors = require('cors');
+const { MongoClient } = require('mongodb');
+require('dotenv').config();
+
+const port = process.env.PORT || 500;
+
+const app = express();
+
+//middleware
+app.use(cors());
+app.use(express.json());
+
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ujcbv.mongodb.net/?retryWrites=true&w=majority`;
+
+console.log(uri);
+
+const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+
+async function run() {
+  try {
+    const appointmentOptionCollection = client.db('safeHealth').collection('appointmentOptions');
+    const bookingsCollection = client.db('safeHealth').collection('bookings');
+
+    app.get('/appointmentOptions', async (req, res) => {
+      const searchTerm = req.query.q;
+      const query = searchTerm ? { name: new RegExp(searchTerm, 'i') } : {};
+      const options = await appointmentOptionCollection.find(query).toArray();
+      const date = req.query.date;
+      const bookingQuery = { appointmentDate: date };
+      const alreadyBooked = await bookingsCollection.find(bookingQuery).toArray();
+
+      options.forEach(options => {
+        const optionBooked = alreadyBooked.filter(book => book.treatment === options.name);
+        const bookedSlots = optionBooked.map(book => book.slot);
+        const remainingSlots = options.slots.filter(slot => !bookedSlots.includes(slot));
+        options.slots = remainingSlots;
+      });
+      res.send(options);
+    });
+
+    app.get('/appointmentList', async (req, res) => {
+      const bookings = await bookingsCollection.find().toArray();
+      res.send(bookings);
+    });
+
+    app.post('/bookings', async (req, res) => {
+      const booking = req.body;
+      console.log(booking);
+      const query = {
+        appointmentDate: booking.appointmentDate,
+        email: booking.email,
+        treatment: booking.treatment
+      };
+      const bookingCounts = await bookingsCollection.find(query).toArray();
+      if (bookingCounts.length) {
+        const message = `you already have an appointment on ${booking.appointmentDate}`;
+        return res.send({ acknowledged: false, message });
+      }
+
+      const result = await bookingsCollection.insertOne(booking);
+      res.send(result);
+    });
+  } finally {
+  }
+}
+
+run().catch(console.log);
+
+app.get('/', async (req, res) => {
+  res.send('doctors server is running');
+});
+
+app.listen(port, () => console.log(`listening on port ${port}`));
