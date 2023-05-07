@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { MongoClient} = require('mongodb');
+const { MongoClient } = require('mongodb');
 const { ObjectId } = require('mongodb');
 const multer = require('multer');
 require('dotenv').config();
@@ -36,17 +36,17 @@ function verifyJWT(req, res, next) {
 
   const authHeader = req.headers.authorization;
   if (!authHeader) {
-      return res.status(401).send('unauthorized access');
+    return res.status(401).send('unauthorized access');
   }
 
   const token = authHeader.split(' ')[1];
 
   jwt.verify(token, process.env.ACCESS_TOKEN, function (err, decoded) {
-      if (err) {
-          return res.status(403).send({ message: 'forbidden access' })
-      }
-      req.decoded = decoded;
-      next();
+    if (err) {
+      return res.status(403).send({ message: 'forbidden access' })
+    }
+    req.decoded = decoded;
+    next();
   })
 
 }
@@ -57,6 +57,22 @@ async function run() {
     const appointmentOptionCollection = client.db('safeHealth').collection('appointmentOptions');
     const bookingsCollection = client.db('safeHealth').collection('bookings');
     const usersCollection = client.db('safeHealth').collection('users');
+    const doctorsCollection = client.db('safeHealth').collection('doctors');
+    const reviewsCollection = client.db('safeHealth').collection('reviews');
+
+
+
+    // NOTE: make sure you use verifyAdmin after verifyJWT
+    const verifyAdmin = async (req, res, next) => {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = await usersCollection.findOne(query);
+
+      if (user?.role !== 'admin') {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      next();
+    }
 
     app.get('/appointmentOptions', async (req, res) => {
       const searchTerm = req.query.q;
@@ -79,11 +95,27 @@ async function run() {
       const bookings = await bookingsCollection.find().toArray();
       res.send(bookings);
     });
-    app.get('/bookings',verifyJWT, async (req, res) => {
+      app.get('/bookings2', async (req, res) => {
+      const bookings = await bookingsCollection.find().toArray();
+      res.send(bookings);
+    });
+    app.get('/bookings', verifyJWT, async (req, res) => {
       const email = req.query.email;
       const decodedEmail = req.decoded.email;
-      if(email !== decodedEmail){
-        return res.status(403).send({message: 'Access Denied '});
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: 'Access Denied ' });
+      }
+      const query = { email: email };
+      const bookings = await bookingsCollection.find(query).toArray();
+      res.send(bookings);
+
+    })
+
+    app.get('/reports', verifyJWT, async (req, res) => {
+      const email = req.query.email;
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: 'Access Denied ' });
       }
       const query = { email: email };
       const bookings = await bookingsCollection.find(query).toArray();
@@ -128,7 +160,7 @@ async function run() {
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       if (user) {
-        const token = jwt.sign({email}, process.env.ACCESS_TOKEN,{ expiresIn:'1h' })
+        const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '30d' })
         return res.send({ accessToken: token });
       }
       res.status(403).send({ accessToken: '' })
@@ -140,32 +172,61 @@ async function run() {
       const result = await usersCollection.find(query).toArray();
       res.send(result);
     })
+    
+    app.get('/users2', async (req, res) => {
+      const { email } = req.query;
+      const query = { email: email };
+      const result = await usersCollection.find(query).toArray();
+      res.send(result);
+    });
+    
+    // app.get('/managedocs', async (req, res) => {
+    //   const query = {};
+    //   const result = await appointmentOptionCollection.find(query).toArray();
+    //   res.send(result);
+    // })
 
+    app.get('/appointmentSpecialty', async (req, res) => {
+      const query = {}
+      const result = await appointmentOptionCollection.find(query).project({ specialty: 1 }).toArray();
+      res.send(result);
+    })
+    app.post('/addDoctor', async (req, res) => {
+      const doctor= req.body;
+      const result = await appointmentOptionCollection.insertOne(doctor);
+      res.send(result);
+    });
+    app.delete('/deletedocs/:id', verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await appointmentOptionCollection.deleteOne(filter);
+      res.send(result);
+    })
 
     app.post('/users', async (req, res) => {
       const user = req.body;
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
-    app.get('/users/admin/:email',async (req, res)=>{
-      const email =req.params.email;
-      const query = {email};
+    app.get('/users/admin/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
       const user = await usersCollection.findOne(query);
-      res.send({isAdmin: user?.role === 'admin' });
+      res.send({ isAdmin: user?.role === 'admin' });
     })
 
-    app.put('/users/admin/:id',verifyJWT, async (req, res) => {
+    app.put('/users/admin/:id', verifyJWT, async (req, res) => {
       const decodedEmail = req.decoded.email;
-      const query = { email: decodedEmail};
-      const user =await usersCollection.findOne(query);
-      if(user?.role !=='admin'){
-        return res.status(403).send({ message: 'Access denied'});
+      const query = { email: decodedEmail };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== 'admin') {
+        return res.status(403).send({ message: 'Access denied' });
       }
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) }; // Add 'new' keyword here
       const updateDoc = { $set: { role: 'admin' } };
       const options = { upsert: true };
-    
+
       try {
         const result = await usersCollection.updateOne(filter, updateDoc, options);
         res.send(result);
@@ -175,6 +236,41 @@ async function run() {
         res.status(500).send('Failed to update user role');
       }
     });
+
+    app.get('/reviews',  async (req, res) => {
+      const query = {};
+      const reviews = await reviewsCollection.find(query).toArray();
+      res.send(reviews);
+    })
+
+    app.post('/reviews', verifyJWT, async (req, res) => {
+      const review = req.body;
+      const result = await reviewsCollection.insertOne(review);
+      res.send(result);
+    });
+
+
+    // app.get('/doctors', verifyJWT, async (req, res) => {
+    //   const query = {};
+    //   const doctors = await doctorsCollection.find(query).toArray();
+    //   res.send(doctors);
+    // })
+
+    // app.post('/doctors', verifyJWT, async (req, res) => {
+    //   const doctor = req.body;
+    //   const result = await doctorsCollection.insertOne(doctor);
+    //   res.send(result);
+    // });
+
+    // app.delete('/doctors/:id', verifyJWT, async (req, res) => {
+    //   const id = req.params.id;
+    //   const filter = { _id: new ObjectId(id) };
+    //   const result = await doctorsCollection.deleteOne(filter);
+    //   res.send(result);
+    // })
+
+
+
 
 
   } finally {
